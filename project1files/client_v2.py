@@ -78,6 +78,7 @@ class Application(Frame):
     self.create_widgets()
   
   def create_widgets(self):
+    print("creating widgets_idnum {}".format(self.idnum))
     frame = Frame(self, width=Application.CANVAS_WIDTH_PX + 200, height=Application.CANVAS_HEIGHT_PX)
     frame.grid(column=0, row=0)
 
@@ -120,6 +121,7 @@ class Application(Frame):
     self.playerlistbox.grid(column=1, row=1, sticky='s')
 
   def set_selected_hand(self, index):
+    print("select hand")
     self.canvas.itemconfigure('hand_rect', fill='#bbb', outline='#000', width=2)
 
     self.selected_hand = index
@@ -134,14 +136,17 @@ class Application(Frame):
     if self.sock:
       with self.infolock:
         idnum = self.idnum
+        print("play time: idnum = {}".format(idnum))
         if idnum != None:
           with self.handlock:
             tileid = self.hand[self.selected_hand]
             rotation = self.handrotations[self.selected_hand]
             if tileid != None:
               self.sock.send(tiles.MessagePlaceTile(idnum, tileid, rotation, x, y).pack())
+              print("tiles.MessagePlaceTiles sent, tileid = {}".format(tileid))
 
   def rotate_hand_tile(self, ev, hand_index):
+    print("rotatehand")
     if hand_index == self.selected_hand:
       with self.handlock:
         self.handrotations[hand_index] = (self.handrotations[hand_index] + 1) % 4
@@ -155,6 +160,7 @@ class Application(Frame):
         x, y = self.lasttilelocation
         print('start at {},{}:{}'.format(x, y, position))
         self.sock.send(tiles.MessageMoveToken(self.idnum, x, y, position).pack())
+        print("tiles.MessageMoveToken() sent, idnum = {}".format(self.idnum))
   
   def clear_board(self):
     self.canvas.configure(bg='white')
@@ -167,6 +173,7 @@ class Application(Frame):
     self.board.draw_tiles(self.canvas, self.boardoffset)
   
   def draw_hand(self):
+    print("draw hand")
     hand_offset = self.hand_offset
 
     self.canvas.delete('handtile')
@@ -179,6 +186,7 @@ class Application(Frame):
           tile.draw(self.canvas, Application.TILE_PX, drawpoint, self.handrotations[i], ('handtile'))
   
   def draw_tokens(self):
+    print("draw tokens")
     with self.boardlock:
       if self.lasttilelocation and not self.location:
         x, y = self.lasttilelocation
@@ -189,6 +197,7 @@ class Application(Frame):
       self.board.draw_tokens(self.canvas, self.boardoffset, self.playernums, self.eliminatedlist)
   
   def draw_turn(self):
+    print("draw turn")
     self.canvas.itemconfigure(self.you_won_text, state='hidden')
     self.canvas.itemconfigure(self.eliminated_text, state='hidden')
     self.canvas.itemconfigure(self.your_turn_text, state='hidden')
@@ -343,6 +352,7 @@ def communication_thread(sock):
     try:
       chunk = sock.recv(4096)
       if chunk:
+        print("client: reading chunk from socket")
         # Read a chunk from the socket, and add it to the end of our buffer
         # (in case we had a partial message in the buffer from a previous
         # chunk, and we need the new chunk to complete it)
@@ -351,10 +361,11 @@ def communication_thread(sock):
         # Unpack as many messages as we can from the buffer.
         while True:
           msg, consumed = tiles.read_message_from_bytearray(buffer)
-          
+          print("unpacked msg{} with {} bytes".format(msg, consumed))
           if consumed:
             buffer = buffer[consumed:]
 
+            print("parse the received msg to examine tile MessageType")
             if isinstance(msg, tiles.MessageWelcome):
               print('Welcome!')
               with app.infolock:
@@ -450,12 +461,13 @@ if len(sys.argv) > 2:
 
 print('Using server hostname {}'.format(server_host))
 
-server_address = (server_host, 30020)
+server_address = (server_host, 30021)
 sock.connect(server_address)
 
 sock.setblocking(True)
 
 comthread = threading.Thread(target=communication_thread, args=[sock])
+print("Thread.start() starts the thread by calling the run method")
 comthread.start()
 
 try:
@@ -465,5 +477,5 @@ finally:
   print('closing sock')
   sock.shutdown(socket.SHUT_WR)
   sock.close()
-
+print("Thread.join() waits for thread to terminate")
 comthread.join()
