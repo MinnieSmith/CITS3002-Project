@@ -20,6 +20,8 @@ import sys
 import tiles
 import select
 import queue
+import logging
+import multiprocessing
 
 
 def initial_connection(inputs, sockets, idnum):
@@ -108,16 +110,18 @@ def process_client_input(message):
                 print("106: output_msg = {}".format(output_msg))
     return output_msg
 
+# set logging config
+logging.basicConfig(format='%(levelname)s - %(asctime)s: %(message)s',datefmt='%H:%M:%S', level=logging.DEBUG)
+
 
 # create a TCP/IP socket
 sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-sock.setblocking(False)
 # listen on all network interfaces
 server_address = ('', 30021)
 sock.bind(server_address)
-
-print('listening on {}'.format(sock.getsockname()))
-
+# set server to non-blocking
+sock.setblocking(False)
+logging.info(f'Listening on port {sock.getsockname()}')
 sock.listen(5)
 
 # Sockets from which we expect to read
@@ -136,7 +140,8 @@ live_idnums = []
 while inputs:
     # readable socket list have incoming data buffered and available to be read
     # writable socket list have free space in buffer that can be written to
-    readable, writable, exceptional = select.select(inputs, outputs, inputs)
+    # timeout must be given or else it will be blocking
+    readable, writable, exceptional = select.select(inputs, outputs, inputs, 0.5)
     for sockets in readable:
         print("sockets in readable:")
         # if socket has incoming data establish a connection
@@ -155,6 +160,9 @@ while inputs:
                 if sockets not in outputs:
                     outputs.append(sockets)
                     print("socket appended to outputs list, if not in it already")
+            #   TODO: data can be processed here and sent back to client
+                
+            # if we don't have data, ie that socket is empty
             else:
                 if sockets in outputs:
                     print("if no data received, then remove socket from ouputs")
@@ -194,3 +202,4 @@ while inputs:
             outputs.remove(sockets)
             sockets.close()
             del message_queues[sockets]
+
