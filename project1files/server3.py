@@ -4,7 +4,6 @@ import select
 import tiles
 import multiprocessing
 
-board = tiles.Board()
 
 class Player():
     def __init__(self, connection: socket, idnum: int, address: str):
@@ -19,17 +18,18 @@ class Player():
 
 
 def initial_connection_deal_hand(player: Player):
-    logging.info(f'Initial connection{player.idnum}')
+    logging.info(f'Initial connection player = {player.idnum}')
     player.conection.send(tiles.MessageWelcome(player.idnum).pack())
     logging.info(f'Server send tiles.MessageWelcome idnum = {player.idnum}')
-    player.conection.send(tiles.MessagePlayerJoined(player.name, player.idnum).pack())
+    for p in players:
+        p.conection.send(tiles.MessagePlayerJoined(player.name, player.idnum).pack())
     player.conection.send(tiles.MessageGameStart().pack())
 
     for _ in range(tiles.HAND_SIZE):
         tileid = tiles.get_random_tileid()
         player.conection.send(tiles.MessageAddTileToHand(tileid).pack())
 
-    player.conection.send(tiles.MessagePlayerTurn(idnum).pack())
+    player.conection.send(tiles.MessagePlayerTurn(player.idnum).pack())
     player.initial_connection = False
 
 
@@ -41,17 +41,20 @@ def player_moves(player: Player):
     if isinstance(player.msg, tiles.MessagePlaceTile):
         if board.set_tile(player.msg.x, player.msg.y, player.msg.tileid, player.msg.rotation, player.msg.idnum):
             # notify client that placement was successful
-            s.send(player.msg.pack())
+            player.conection.send(player.msg.pack())
 
             # check for token movement
             positionupdates, eliminated = board.do_player_movement(live_idnums)
 
-            for player.msg in positionupdates:
-                s.send(player.msg.pack())
+            for msg in positionupdates:
+                for p in players:
+                    p.conection.send(msg.pack())
+                    logging.info(f'Player {p.idnum} was sent position update {msg}')
 
-            if idnum in eliminated:
+            if player.idnum in eliminated:
                 # remove the player from the active players list
                 players.remove(player)
+                live_idnums.remove(player.idnum)
                 player.conection.send(tiles.MessagePlayerEliminated(player.idnum).pack())
                 return
 
@@ -60,33 +63,36 @@ def player_moves(player: Player):
             player.conection.send(tiles.MessageAddTileToHand(tileid).pack())
 
             # start next turn
-            player.conection.send(tiles.MessagePlayerTurn(idnum).pack())
+            player.conection.send(tiles.MessagePlayerTurn(player.idnum).pack())
 
     # sent by the player in the second turn, to choose their token's
     # starting path
     elif isinstance(player.msg, tiles.MessageMoveToken):
-        if not board.have_player_position(player.idnum):
-            if board.set_player_start_position(player.idnum, player.msg.x, player.msg.y, player.msg.position):
+        if not board.have_player_position(player.msg.idnum):
+            if board.set_player_start_position(player.msg.idnum, player.msg.x, player.msg.y, player.msg.position):
                 # check for token movement
                 positionupdates, eliminated = board.do_player_movement(live_idnums)
 
                 for msg in positionupdates:
-                    s.send(msg.pack())
+                    p.conection.send(msg.pack())
+                    logging.info(f'Player {p.idnum} was sent position update {msg}')
 
-                if idnum in eliminated:
+                if player.idnum in eliminated:
                     # remove the player from the active players list
                     players.remove(player)
-                    s.send(tiles.MessagePlayerEliminated(idnum).pack())
+                    live_idnums.remove(player.idnum)
+                    player.conection.send(tiles.MessagePlayerEliminated(player.idnum).pack())
                     return
 
                 # start next turn
-                s.send(tiles.MessagePlayerTurn(idnum).pack())
+                for p in players:
+                    p.conection.send(tiles.MessagePlayerTurn(player.idnum).pack())
+                    logging.info(f'Player {p.idnum} was sent playerTurn info')
 
-    player.msg = None
+
 
 # set logging config
-logging.basicConfig(format='%(levelname)s - %(asctime)s: %(message)s',datefmt='%H:%M:%S', level=logging.DEBUG)
-
+logging.basicConfig(format='%(levelname)s - %(asctime)s: %(message)s', datefmt='%H:%M:%S', level=logging.DEBUG)
 
 # create a TCP/IP socket
 sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -105,6 +111,8 @@ outputs = [sock]
 
 idnum = 0
 players = []
+board = tiles.Board()
+
 
 buffer = bytearray()
 
@@ -148,7 +156,11 @@ while True:
 
                 # if we don't receive any data
                 else:
-                    logging.info(f'Remove player {s} from inputs sockets list')
+
+                    for p in players:
+                        if p.conection == s:
+                            players.remove(p)
+                            logging.info(f'Remove player {p.idnum} from inputs sockets list')
                     s.close()
                     inputs.remove(s)
         except Exception as ex:
@@ -156,7 +168,12 @@ while True:
 
     for s in writable:
         logging.info('WRITABLE')
+        live_idnums = []
+        for p in players:
+            live_idnums.append(p.idnum)
+        logging.info(f'Players List = {live_idnums}')
         conn = Player
+
         for p in players:
             if s == p.conection:
                 conn = p
@@ -164,6 +181,7 @@ while True:
                     initial_connection_deal_hand(p)
                 else:
                     player_moves(p)
+                    p.msg = None
                 outputs.remove(s)
 
     for s in errors:
@@ -179,10 +197,6 @@ while True:
         s.close()
         pass
 
-
 # game_server = multiprocessing.Process(target=server, daemon=True, name='Server')
 # game_server.start()
 # game_server.join()
-
-
-
