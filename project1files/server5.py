@@ -6,6 +6,7 @@ import select
 import queue
 import tiles
 import random
+import time
 
 MAX_PLAYERS = 2
 
@@ -54,20 +55,24 @@ def shuffle_players(client_list):
     random.shuffle(client_list)
 
 
-def get_next_player_idnum(client_socket, eliminated_list):
+def get_next_player_idnum(client_socket, eliminated_list, players):
     logging.info("Getting next player idnum")
     current_index = 0
     current_idnum = 0
     number_of_players = len(players)
+    idnums_remaining = live_idnums.copy()
 
     for p in range(len(players)):
         if players[p].connection == client_socket:
             current_idnum = players[p].idnum
             current_index = p
-    if len(live_idnums) == 1:
-        logging.info(f'48: live idnums = {live_idnums}')
-        return live_idnums[0]
 
+    for players in eliminated_list:
+        idnums_remaining.remove(players)
+
+    if len(idnums_remaining) == 1:
+        logging.info(f'48: live idnums = {idnums_remaining}')
+        return idnums_remaining[0]
     else:
         if current_idnum in eliminated_list:
             next_index = current_index
@@ -80,6 +85,7 @@ def get_next_player_idnum(client_socket, eliminated_list):
         next_idnum = players[next_index].idnum
 
         logging.info(f'Next Player Idnum = {next_idnum}')
+
         return next_idnum
 
 
@@ -114,6 +120,7 @@ def start_new_game():
     for a in all_connections:
         for i in players:
             msg_queue[a.connection].put(tiles.MessagePlayerJoined(i.name, i.idnum).pack())
+
         # notify players that the game is starting
         msg_queue[a.connection].put(tiles.MessageGameStart().pack())
 
@@ -175,6 +182,8 @@ while True:
 
                 # if game hasn't started check if there are enough players to start a game:
                 if not game_started and enough_clients_to_start_a_game():
+                    for a in all_connections:
+                        msg_queue[a.connection].put(tiles.MessageCountdown().pack())
                     start_new_game()
                     game_started = True
 
@@ -215,7 +224,7 @@ while True:
                                     for p in players:
                                         msg_queue[p.connection].put(msg.pack())
 
-                                next_player_idnum = get_next_player_idnum(s, eliminated)
+                                next_player_idnum = get_next_player_idnum(s, eliminated, players)
 
                                 for eliminated_player in eliminated:
                                     # remove player from live_idnums list
@@ -240,10 +249,9 @@ while True:
                                 if if_game_is_over():
                                     game_started = False
                                     players.clear()
-                                    logging.info(
-                                        f'228: Connected clients waiting to play = {len(connected_clients_waiting_to_play)}')
                                     if enough_clients_to_start_a_game():
-                                        logging.info("230: Starting new game!")
+                                        for a in all_connections:
+                                            msg_queue[a.connection].put(tiles.MessageCountdown().pack())
                                         start_new_game()
                                         game_started = True
 
@@ -272,7 +280,7 @@ while True:
                                         for p in players:
                                             msg_queue[p.connection].put(msg.pack())
 
-                                    next_player_idnum = get_next_player_idnum(s, eliminated)
+                                    next_player_idnum = get_next_player_idnum(s, eliminated, players)
 
                                     for eliminated_player in eliminated:
                                         # remove player from live_idnums list
@@ -298,11 +306,17 @@ while True:
                                         game_started = False
                                         logging.info(f"284: Players = {len(players)}")
                                         connected_clients_waiting_to_play.append(players.pop(0))
-                                        logging.info(f'286: Connected clients waiting to play = {len(connected_clients_waiting_to_play)}')
                                         if enough_clients_to_start_a_game():
-                                            logging.info("288: Starting new game!")
+                                            for a in all_connections:
+                                                msg_queue[a.connection].put(tiles.MessageCountdown().pack())
                                             start_new_game()
                                             game_started = True
+                                    else:
+                                        # start next turn
+                                        # try just sending back the same idnum to all clients:
+                                        for p in players:
+                                            msg_queue[p.connection].put(
+                                                tiles.MessagePlayerTurn(next_player_idnum).pack())
 
                     if s not in outputs:
                         outputs.append(s)
