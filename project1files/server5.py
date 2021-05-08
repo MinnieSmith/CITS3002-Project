@@ -68,8 +68,7 @@ def get_next_player_idnum(client_socket, eliminated_list, players):
             current_index = p
 
     for players in eliminated_list:
-        if players in idnums_remaining:
-            idnums_remaining.remove(players)
+        idnums_remaining.remove(players)
 
     if len(idnums_remaining) == 1:
         logging.info(f'48: live idnums = {idnums_remaining}')
@@ -103,6 +102,7 @@ def if_game_is_over():
 def start_new_game():
     shuffle_players(connected_clients_waiting_to_play)
     live_idnums.clear()
+    logging.info("105: Live idnums cleared")
 
     if not_enough_players():
         # add waiting clients to players list and live_idnums
@@ -146,22 +146,6 @@ def start_new_game():
     # reset the board
     board.reset()
 
-
-def start_next_game_if_enough_players(game_started):
-    if if_game_is_over():
-        game_started = False
-        connected_clients_waiting_to_play.append(players.pop(0))
-
-        if enough_clients_to_start_a_game():
-            for a in all_connections:
-                msg_queue[a.connection].put(tiles.MessageCountdown().pack())
-            t = Timer(5.0, start_new_game)
-            t.start()
-            logging.info('Timer started')
-            game_started = True
-
-    return game_started
-
 logging.basicConfig(format='%(levelname)s - %(asctime)s: %(message)s', datefmt='%H:%M:%S', level=logging.DEBUG)
 
 # create the socket for the server
@@ -182,7 +166,6 @@ live_idnums = []
 connected_clients_waiting_to_play = []
 all_connections = []
 players = []
-next_player_idnum = 0
 game_started = False
 board = tiles.Board()
 buffer = bytearray()
@@ -202,8 +185,6 @@ while True:
                 if not game_started and enough_clients_to_start_a_game():
                     for a in all_connections:
                         msg_queue[a.connection].put(tiles.MessageCountdown().pack())
-                    t = Timer(5.0, start_new_game)
-                    t.start()
                     start_new_game()
                     game_started = True
 
@@ -239,6 +220,7 @@ while True:
                                 # logging.info(f'Move player token if possible for live_idnum: {live_idnums}')
                                 # logging.info(f'Position Updates: {positionupdates}')
 
+                                # TODO: check if position updates and eliminated need to be sent to all clients!
                                 for msg in positionupdates:
                                     for p in players:
                                         msg_queue[p.connection].put(msg.pack())
@@ -264,7 +246,20 @@ while True:
                                         if p.idnum == eliminated_player:
                                             players.remove(p)
 
-                                if not if_game_is_over():
+
+                                if if_game_is_over():
+                                    game_started = False
+                                    connected_clients_waiting_to_play.append(players[0])
+                                    players.clear()
+                                    if enough_clients_to_start_a_game():
+                                        for a in all_connections:
+                                            msg_queue[a.connection].put(tiles.MessageCountdown().pack())
+                                        t = Timer(5.0, start_new_game)
+                                        t.start()
+                                        logging.info('Timer started')
+                                        game_started = True
+
+                                else:
                                     # start next turn
                                     # try just sending back the same idnum to all clients:
                                     for p in players:
@@ -275,7 +270,6 @@ while True:
                                     msg_queue[s].put(tiles.MessageAddTileToHand(tileid).pack())
 
 
-                                game_started = start_next_game_if_enough_players(game_started)
 
                         # sent by the player in the second turn, to choose their token's
                         # starting path
@@ -302,7 +296,6 @@ while True:
                                             msg_queue[p.connection].put(
                                                 tiles.MessagePlayerEliminated(eliminated_player).pack())
 
-
                                         for i in range(len(players)):
                                             if players[i].idnum == eliminated_player:
                                                 # remove from players list and add back to waiting list
@@ -312,18 +305,28 @@ while True:
                                             if p.idnum == eliminated_player:
                                                 players.remove(p)
 
-                                    if not if_game_is_over():
+                                    if if_game_is_over():
+                                        connected_clients_waiting_to_play.append(players[0])
+                                        players.clear()
+                                        game_started = False
+                                        logging.info(f"284: Players = {len(players)}")
+                                        if enough_clients_to_start_a_game():
+                                            for a in all_connections:
+                                                msg_queue[a.connection].put(tiles.MessageCountdown().pack())
+                                            t = Timer(5.0, start_new_game)
+                                            t.start()
+                                            logging.info('Timer started')
+                                            game_started = True
+
+                                    else:
                                         # start next turn
                                         # try just sending back the same idnum to all clients:
                                         for p in players:
                                             msg_queue[p.connection].put(
                                                 tiles.MessagePlayerTurn(next_player_idnum).pack())
 
-                            game_started = start_next_game_if_enough_players(game_started)
-
                     if s not in outputs:
                         outputs.append(s)
-
                 else:
                     # if no data received, socket closed and removed from all i/o and msg_queues
                     logging.info(f'Client {s.getpeername()} disconnected')
@@ -348,4 +351,3 @@ while True:
         else:
             # logging.info(f'Sending {next_msg.decode("utf-8")} to {s.getpeername()}')
             s.send(next_msg)
-
