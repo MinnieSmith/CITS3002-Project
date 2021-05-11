@@ -70,6 +70,7 @@ class Game:
         return len(self.current_players)
 
     def not_enough_players(self):
+        logging.info("73")
         return len(self.current_players) < MAX_PLAYERS
 
     def enough_clients_to_start_a_game(self):
@@ -172,7 +173,7 @@ class Game:
             # check if players have been eliminated and add new players
             joining_players = []
 
-            number_of_players_to_add = min(((MAX_PLAYERS - len(self.current_players)), len(self.waiting_clients)),
+            number_of_players_to_add = min(MAX_PLAYERS - len(self.current_players), len(self.waiting_clients),
                                            len(eliminated_list))
             logging.info(f'177: players to add = {number_of_players_to_add}')
 
@@ -315,7 +316,8 @@ while True:
                                             if p.idnum == eliminated_player:
                                                 game.current_players.remove(p)
 
-                                    game.replace_eliminated_players(eliminated)
+                                    if eliminated:
+                                        game.replace_eliminated_players(eliminated)
 
                                     if not game.if_game_is_over():
                                         logging.info("306")
@@ -368,7 +370,8 @@ while True:
                                             for c in game.waiting_clients:
                                                 connected_idnums = [c.idnum]
 
-                                        game.replace_eliminated_players(eliminated)
+                                        if eliminated:
+                                            game.replace_eliminated_players(eliminated)
                                         if not game.if_game_is_over():
                                             # start next turn
                                             for a in game.all_connections:
