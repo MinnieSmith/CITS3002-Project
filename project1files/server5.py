@@ -139,9 +139,9 @@ class Game:
                 self.current_players.append(new_player)
                 self.all_players_that_have_played.append(new_player)
                 self.live_idnums.append(new_player.idnum)
-            for p in self.current_players:
-                if p in self.waiting_clients:
-                    self.waiting_clients.remove(p)
+        for p in self.current_players:
+            if p in self.waiting_clients:
+                self.waiting_clients.remove(p)
 
 
         # notify players that the game is starting
@@ -151,8 +151,6 @@ class Game:
         # notify all clients of players turn positions
         for a in self.all_connections:
             for p in self.current_players:
-                # game.msg_queue[a.connection].put(tiles.MessagePlayerLeft(p.idnum).pack())
-                game.msg_queue[a.connection].put(tiles.MessagePlayerJoined(p.name, p.idnum).pack())
                 game.msg_queue[a.connection].put(tiles.MessagePlayerTurn(p.idnum).pack())
 
         for p in self.current_players:
@@ -224,6 +222,8 @@ class Game:
                 # deal hand
                 for j in joining_players:
                     self.msg_queue[j.connection].put(tiles.MessagePlayerTurn(self.current_player.idnum).pack())
+                    for e in self.all_players_eliminated_from_game:
+                        self.msg_queue[j.connection].put(tiles.MessagePlayerEliminated(e).pack())
                     for _ in range(tiles.HAND_SIZE):
                         tileid = tiles.get_random_tileid()
                         game.msg_queue[j.connection].put(tiles.MessageAddTileToHand(tileid).pack())
@@ -236,7 +236,7 @@ class Game:
         if len(self.all_players_eliminated_from_game) < (MAX_PLAYERS - 1):
             self.current_players.append(new_player)
             self.all_players_that_have_played.append(new_player)
-            self.live_idnums.append(new_player)
+            self.live_idnums.append(new_player.idnum)
             self.waiting_clients.remove(new_player)
 
             # reset all turn positions
@@ -246,6 +246,8 @@ class Game:
 
             # send player current turn info
             # deal hand
+            for e in self.all_players_eliminated_from_game:
+                self.msg_queue[new_player.connection].put(tiles.MessagePlayerEliminated(e).pack())
             self.msg_queue[new_player.connection].put(tiles.MessagePlayerTurn(self.current_player.idnum).pack())
             for _ in range(tiles.HAND_SIZE):
                 tileid = tiles.get_random_tileid()
@@ -267,6 +269,8 @@ class Game:
         # notify the client of all player positions
         for p in self.current_players:
             self.msg_queue[new_player.connection].put(tiles.MessagePlayerTurn(p.idnum).pack())
+        for e in self.all_players_eliminated_from_game:
+            self.msg_queue[new_player.connection].put(tiles.MessagePlayerEliminated(e).pack())
 
         # catch them up on tiles on the board
         for h in range(self.board.height):
@@ -409,7 +413,7 @@ while True:
                                         for msg in positionupdates:
                                             for a in game.all_connections:
                                                 game.msg_queue[a.connection].put(msg.pack())
-                                        logging.info("346")
+                                                logging.info("346")
                                         next_player_idnum = game.get_next_player_idnum(s, eliminated)
                                         logging.info("351")
 
