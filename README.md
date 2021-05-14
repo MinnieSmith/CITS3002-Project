@@ -45,7 +45,7 @@ List the ready features implemented by server.py:
 
 
 ## Screenshots
-![tilesgame](/tilesgame.png)
+![tilesgame](/README/tilesgame.png)
 
 
 ## Setup
@@ -56,9 +56,11 @@ Download Project. Make sure you have Python 3.0 and higher and running on a Unix
 Open multiple terminal windows
 In commnand line, navigate to the folder.
 In one of the terminal window, run: 
+
 `python3 server.py`
 
 In other terminal windows, run:
+
 `python3 client_v2.py`
 
 Do this last step at least twice, to create two clients.
