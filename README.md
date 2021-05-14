@@ -55,9 +55,9 @@ Download Project. Make sure you have Python 3.0 and higher and running on a Unix
 
 
 ## Usage
-Open multiple terminal windows
-In commnand line, navigate to the folder.
-In one of the terminal window, run: 
+Open multiple terminal windows.
+In command line, navigate to the folder.
+In one of the terminal windows, run: 
 
 `python3 server.py`
 
