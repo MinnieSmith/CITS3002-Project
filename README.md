@@ -59,8 +59,9 @@ Open multiple terminal windows.
 In command line, navigate to the folder.
 In one of the terminal windows, run: 
 
-`python3 server.py`
+`python3 server5.py`
 
+This is the final working version!
 In other terminal windows, run:
 
 `python3 client_v2.py`
