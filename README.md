@@ -47,6 +47,9 @@ List the ready features implemented by server.py:
 ## Screenshots
 ![tilesgame](/README/tilesgame.png)
 
+<img width="2126" alt="tilesgame" src="https://user-images.githubusercontent.com/37872572/118247463-cb7e0700-b4d5-11eb-99ec-f4e98e74fa43.png">
+
+
 
 ## Setup
 Download Project. Make sure you have Python 3.0 and higher and running on a Unix Platform.
